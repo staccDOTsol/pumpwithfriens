@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use std::str::FromStr;
 use anchor_lang::{solana_program::{instruction::Instruction, program::invoke_signed}, system_program::{self, Transfer}};
 
-declare_id!("CniMsrpSgFcRahq8aZVYaPvoXLxbr5CtaMTdGj4KjTG2");
+declare_id!("22Jwcjoi8ffW8gG7LYqVX5mHK4u7RyN5xNf8TE1hsS9P");
 
 #[program]
 pub mod pumpinator {
@@ -23,9 +23,8 @@ pub mod pumpinator {
         Ok(())
     }
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        let seeds: &[&[_]] = &[b"friend", ctx.accounts.authority.key.as_ref()];
         let bump = &[ctx.bumps.friend];
-        let signers_seeds = &[seeds, &[bump]];
+        let signers_seeds: &[&[&[u8]]] = &[&[b"friend", ctx.accounts.authority.key.as_ref()], &[bump]];
         let cpi_context = CpiContext::new_with_signer(ctx.accounts.system_program.to_account_info().clone(), Transfer {
             from: ctx.accounts.friend.to_account_info(),
             to: ctx.accounts.authority.to_account_info(),
@@ -35,15 +34,20 @@ pub mod pumpinator {
     }
     pub fn pump(ctx: Context<Pump>, data: Vec<u8>) -> Result<()> {
         let remaining_accounts = ctx.remaining_accounts;
-        let keys = remaining_accounts.iter().map(|account| account.to_account_info()).collect::<Vec<_>>();
+        let mut keys = remaining_accounts.iter().map(|account| account.to_account_info()).collect::<Vec<_>>();
         assert!(keys[6].key == ctx.accounts.friend.to_account_info().key);
         let data = data.to_vec();
-        let seeds: &[&[_]] = &[b"friend", ctx.accounts.authority.key.as_ref()];
         let bump = &[ctx.bumps.friend];
-        let signers_seeds = &[seeds, &[bump]];
+
+        let signers_seeds: &[&[&[u8]]] = &[&[b"friend", ctx.accounts.authority.key.as_ref()], &[bump]];
+
         let instruction = Instruction {
             program_id: Pubkey::from_str("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P").unwrap(),
-            accounts: keys.to_account_metas(Some(true)),
+            accounts: keys.iter().map(|account| AccountMeta {
+                pubkey: *account.key,
+                is_signer: account.is_signer,
+                is_writable: account.is_writable,
+            }).collect::<Vec<_>>(),
             data
         };
         invoke_signed(&instruction, &remaining_accounts, signers_seeds)?;
