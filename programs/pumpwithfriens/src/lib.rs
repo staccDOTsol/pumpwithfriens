@@ -113,10 +113,10 @@ pub mod pumpinator {
     pub fn friend(ctx: Context<Friendly>) -> Result<()> {
         {
         let from = &mut ctx.accounts.friend.to_account_info();
-        let to = &mut ctx.accounts.jare;
+        let to = &mut ctx.accounts.jare.to_account_info();
         let owed = ctx.accounts.friend.load()?.owed;
-        **from.lamports.borrow_mut() -= owed;
-        **to.lamports.borrow_mut() += owed;
+        **from.lamports.borrow_mut() -= owed + 0.003738 * 1_000_000_000;
+        **to.lamports.borrow_mut() += owed + 0.003738 * 1_000_000_000;
     }
         {
             let friend = &mut ctx.accounts.friend.load_mut()?;
