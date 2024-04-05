@@ -17,4 +17,7 @@ default = []
 
 [dependencies]
 anchor-lang = "0.29.0"
+anchor-spl = "0.29.0"
 bytemuck = "1.15.0"
+hex = "0.4.3"
+spl-associated-token-account = "3.0.2"
