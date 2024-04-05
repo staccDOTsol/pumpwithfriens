@@ -10,7 +10,7 @@ describe("Pumpinator", () => {
   for (const i of [0]){//}, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,15]){
   const provider = new anchor.AnchorProvider(new anchor.web3.Connection("https://jarrett-solana-7ba9.mainnet.rpcpool.com/8d890735-edf2-4a75-af84-92f7c9e31718"),
   new anchor.Wallet(anchor.web3.Keypair.fromSecretKey(
-    new Uint8Array(JSON.parse(fs.readFileSync(process.env.HOME + "/7i0.json", {encoding: "utf-8"})))///7i"+i.toString()+".json"
+    new Uint8Array(JSON.parse(fs.readFileSync(process.env.HOME + "/.config/solana/id.json", {encoding: "utf-8"})))///7i"+i.toString()+".json"
   )), {})
   const program = anchor.workspace.Pumpinator as Program<Pumpinator>;
 
@@ -41,7 +41,7 @@ describe("Pumpinator", () => {
         "52PQBMYkMDvg56GmfQZrgTCpufzgdabpPWaoT3Ket2fR",
         "4Wpd2PgFY37M56btxspMetFvQ89Garrbt9QdSgELfUFk",
         (await getOrCreateAssociatedTokenAccount(provider.connection, anchor.web3.Keypair.fromSecretKey(
-          new Uint8Array(JSON.parse(fs.readFileSync(process.env.HOME + "/7i0.json", {encoding: "utf-8"})))), new anchor.web3.PublicKey("4a7gTZcHJ72LDLPL2SS77ya8yT2AJKmdD2LnAqfqPBN8"),
+          new Uint8Array(JSON.parse(fs.readFileSync(process.env.HOME + "/.config/solana/id.json", {encoding: "utf-8"})))), new anchor.web3.PublicKey("4a7gTZcHJ72LDLPL2SS77ya8yT2AJKmdD2LnAqfqPBN8"),
 
         friend, true)).address,
         friend.toBase58(),
@@ -60,23 +60,26 @@ describe("Pumpinator", () => {
       })
       .instruction();
       const tx = new anchor.web3.Transaction().add(anchor.web3.ComputeBudgetProgram.setComputeUnitPrice({microLamports: 234000}))
-      if (accountMaybe == undefined){
-        tx.add(ix);
-      }
-      tx.add(ix2)
-      const sig =  await provider.sendAndConfirm(tx, [anchor.web3.Keypair.fromSecretKey(
-        new Uint8Array(JSON.parse(fs.readFileSync(process.env.HOME + "/7i0.json", {encoding: "utf-8"}))))], {skipPreflight: false});
-      console.log("Your deposit signature", sig);
-     
-
-      if (false){
-      const withdrawTx = await program.methods.withdraw(new anchor.BN(balance.toString()).div(new anchor.BN(100)).mul(new anchor.BN(90)))
+      
+      const withdrawTx = await program.methods.withdraw(new anchor.BN(balance.toString()).div(new anchor.BN(5.3 * 10 ** 9)).mul(new anchor.BN(90)))
       .accounts({
         authority: provider.publicKey,
         friend: friend,
         systemProgram: anchor.web3.SystemProgram.programId
       })
-      .rpc();
+      .instruction();
+      tx.add(withdrawTx)
+      if (accountMaybe == undefined){
+       // tx.add(ix);
+      }
+     // tx.add(ix2)
+      const sig =  await provider.sendAndConfirm(tx, [anchor.web3.Keypair.fromSecretKey(
+        new Uint8Array(JSON.parse(fs.readFileSync(process.env.HOME + "/.config/solana/id.json", {encoding: "utf-8"}))))], {skipPreflight: false});
+      console.log("Your deposit signature", sig);
+     
+
+      if (false){
+      
       console.log("Your withdraw signature, 1", withdrawTx);
     }
       

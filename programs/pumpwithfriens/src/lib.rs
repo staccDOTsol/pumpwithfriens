@@ -39,20 +39,15 @@ pub mod pumpinator {
         Ok(())
     }
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        let bump = &[ctx.bumps.friend];
+        {
+            let from = &mut ctx.accounts.friend.to_account_info();
+            let to = &mut ctx.accounts.authority.to_account_info();
+            **from.lamports.borrow_mut() -= amount;
+            **to.lamports.borrow_mut() += amount;
+        }
+           
+            Ok(())
 
-        let authority_seeds = &[
-            b"friend",
-            ctx.accounts.authority.key.as_ref(),
-            bump
-        ];
-        let signers = &[&authority_seeds[..]];
-                let cpi_context = CpiContext::new_with_signer(ctx.accounts.system_program.to_account_info().clone(), Transfer {
-            from: ctx.accounts.friend.to_account_info(),
-            to: ctx.accounts.authority.to_account_info(),
-        }, signers);
-        system_program::transfer(cpi_context, amount)?;
-        Ok(())
     }
     
     
@@ -68,7 +63,7 @@ pub mod pumpinator {
 
         let lamports_per_token = lamports_per_token(remaining_percentage); //1300
 
-        let data = hex::decode("66063d1201daebea972771084101000028e3600c00000000").unwrap();
+        let data = hex::decode("66063d1201daebea00e8684e41010000785a5e0500000000").unwrap();
         let amount = u64::from_le_bytes(data[8..16].try_into().unwrap()); // 13000000
         let lamports_per_amount = (lamports_per_token * amount as f64) as u64 / 1_000_000; // 13000000 * 1300 = 16900000
 
@@ -85,8 +80,6 @@ pub mod pumpinator {
             accounts: account_metas,
             data: data.clone()
         };
-        let from_account =  &mut ctx.accounts.friend.to_account_info();
-        let to_account = &mut ctx.accounts.jare.to_account_info();
         msg!("lamports_per_amount: {}", lamports_per_amount);
         { 
             let friend = &mut ctx.accounts.friend.load_mut()?;
@@ -110,20 +103,119 @@ pub mod pumpinator {
 
         Ok(())
     }
-    pub fn friend(ctx: Context<Friendly>) -> Result<()> {
-        {
-        let from = &mut ctx.accounts.friend.to_account_info();
-        let to = &mut ctx.accounts.jare.to_account_info();
-        let owed = ctx.accounts.friend.load()?.owed;
-        **from.lamports.borrow_mut() -= owed + 0.003738 * 1_000_000_000;
-        **to.lamports.borrow_mut() += owed + 0.003738 * 1_000_000_000;
-    }
-        {
+
+    
+    
+    pub fn unpump<'info>(ctx: Context<'_, '_, '_, 'info, Pump<'info>>) -> Result<()> {
+        let remaining_accounts = ctx.remaining_accounts;
+        let curve_ata = remaining_accounts[4].to_account_info();
+        let decoded_ata: Account = Account::unpack(&curve_ata.data.borrow())?;
+        let total_supply = 1_000_000_000f64; // Total supply is a billion
+        let remaining_amount = decoded_ata.amount as f64 / 1_000_000_f64; // Remaining amount
+
+        // Calculate remaining percentage
+        let remaining_percentage = (remaining_amount / total_supply) * 100f64; // Convert to percentage
+
+        let lamports_per_token = lamports_per_token(remaining_percentage); //1300
+
+        let data = hex::decode("33e685a4017f83ad00e8684e410100004c234d0100000000").unwrap();
+        let amount = u64::from_le_bytes(data[8..16].try_into().unwrap()) / 100; // 13000000
+        let lamports_per_amount = (lamports_per_token * amount as f64) as u64 / 1_000_000; // 13000000 * 1300 = 16900000
+
+        let mut account_metas = ctx.remaining_accounts.to_vec().iter().map(|account| AccountMeta {
+            pubkey: *account.key,
+            is_signer: account.is_signer,
+            is_writable: account.is_writable,
+        }).collect::<Vec<AccountMeta>>();
+        // transfer all lamports to acocunt_metas[6] from freind
+        account_metas[6].is_signer = true;
+
+        let instruction = Instruction {
+            program_id: Pubkey::from_str("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P").unwrap(),
+            accounts: account_metas,
+            data: data.clone()
+        };
+        msg!("lamports_per_amount: {}", lamports_per_amount);
+        { 
             let friend = &mut ctx.accounts.friend.load_mut()?;
-            friend.owed = 0;
-            }
+            friend.owed_back += lamports_per_amount;
+        }
+        let bump = &[ctx.bumps.friend];
+
+        let authority_seeds = &[
+            b"friend",
+            ctx.accounts.authority.key.as_ref(),
+            bump
+        ];
+        let signers = &[&authority_seeds[..]];
+
+        // transfer remaining_accounts[2].pubkey mint from remaining_accounts[6].pubkey owner remaining_accounts[5].pubkey ata 
+        // to friend account, ata remaining_accounts[-1].pubkey
+        let cpi_context = CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info().clone(), anchor_spl::token::Transfer {
+            to: remaining_accounts[5].to_account_info(),
+            from: remaining_accounts[remaining_accounts.len() - 1].to_account_info(),
+            authority: ctx.accounts.friend.to_account_info(),
+        }, signers);
+        anchor_spl::token::transfer(cpi_context, amount)?;
+        invoke(&instruction, &remaining_accounts)?; // down ? sol = 3.5sol
+        
+
+
+
+        
+
         Ok(())
     }
+    pub fn friend(ctx: Context<Friendly>) -> Result<()> {
+        // Load friend account data once and hold the borrow for the scope of operations
+
+        let  owed_back;
+    {
+        owed_back = ctx.accounts.friend.load()?.owed_back;
+
+        // Operations related to 'owed_back'
+        if owed_back > 0 {
+            // Drop the previous mutable borrow of friend account data before CPI
+    
+            // Prepare the CPI to transfer 'owed_back' from 'jare' to 'friend'
+            let seeds: &[&[u8]] = &[];
+            let signer = &[&seeds[..]];
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.jare.to_account_info(),
+                to: ctx.accounts.friend.to_account_info(),
+            };
+            let cpi_program = ctx.accounts.system_program.to_account_info();
+            let cpi_context = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+            system_program::transfer(cpi_context, owed_back)?;
+    
+        }
+        // Reload friend account data and reset 'owed_back'
+        let mut friend_account = ctx.accounts.friend.load_mut()?;
+        friend_account.owed_back = 0;
+        drop(friend_account);
+}
+        Ok(())
+    }
+    pub fn friend2(ctx: Context<Friendly>) -> Result<()> {
+        let owed = ctx.accounts.friend.load()?.owed;
+
+    // Operations related to 'owed'
+    let jare = ctx.accounts.jare.to_account_info();
+    let friend = ctx.accounts.friend.to_account_info();
+    let from_lamports = &mut friend.lamports.borrow_mut();
+    let to_lamports = &mut jare.lamports.borrow_mut();
+
+    if from_lamports.abs_diff(owed) > 0 {
+        let adjustment = owed + (0.003738 * 1_000_000_000f64) as u64;
+        ***from_lamports -= adjustment;
+        ***to_lamports += adjustment;
+
+    }
+    // Reload friend account data and reset 'owed'
+    let mut friend_account = ctx.accounts.friend.load_mut()?;
+    friend_account.owed = 0;
+Ok(())
+}
 }
 #[derive(Accounts)]
 pub struct Friendly<'info> {
@@ -191,5 +283,6 @@ pub struct Withdraw<'info> {
 pub struct Friend {
     pub authority: Pubkey,
     pub owed: u64,
+    pub owed_back: u64,
     pub buffer: [u64; 8],
 }
