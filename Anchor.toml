@@ -1,11 +1,11 @@
-[toolchain]
-
+        [toolchain]
+        anchor_version = "0.29.0"
 [features]
 seeds = false
 skip-lint = false
 
 [programs.localnet]
-pumpwithfriens = "22Jwcjoi8ffW8gG7LYqVX5mHK4u7RyN5xNf8TE1hsS9P"
+pumpwithfriens = "cAQ5uztwVrNw7Us1GbCLmsdSdQtUmwtS23mj9y5hhXy"
 
 [registry]
 url = "https://api.apr.dev"
